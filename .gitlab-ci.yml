@@ -8,10 +8,10 @@
     HELM_NAMESPACE: eo4eu/eo4eu-cicd/cicd-infra
     REGISTRY: registry.apps.eo4eu.eu
     REPO: uc2
-    APP: eo4eu-fuelconsumption
+    APP: eo4eu-windprediction
     SERVICE: inference-server
     HELM: helm-repo
-    REPO_BRANCH: main
+    REPO_BRANCH: WindPrediction
     HELM_BRANCH: main
   before_script:
     - "apk --no-cache add jq"
@@ -61,7 +61,7 @@ update_domain:
           cookiecutter-config.yaml | \
           awk '{print $2}' | tr -d '"')
         sed -i "s/\.svc\..*\.local/.svc.$CLUSTER_DOMAIN.local/g" \
-          FuelConsumption.py
+          WindPrediction.py
         git config user.email "federico.fornari@ecmwf.int"
         git config user.name "Cookiecutter"
         git add --all
@@ -76,7 +76,7 @@ build_image:
   script:
     - cd $REPO
     - |
-      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|FuelConsumption\.py|requirements\.txt)$'; then
+      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|WindPrediction\.py|requirements\.txt)$'; then
         dagger call build \
         --bucket $BUCKET \
         --endpoint https://$MINIO \
@@ -95,7 +95,7 @@ scan_image:
   script:
     - cd $REPO
     - |
-      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|FuelConsumption\.py|requirements\.txt)$'; then
+      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|WindPrediction\.py|requirements\.txt)$'; then
         dagger call scan \
         --bucket $BUCKET \
         --endpoint https://$MINIO \
@@ -123,7 +123,7 @@ push_image:
   script:
     - cd $REPO
     - |
-      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|FuelConsumption\.py|requirements\.txt)$'; then
+      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|WindPrediction\.py|requirements\.txt)$'; then
         dagger call push \
         --registry $REGISTRY \
         --namespace $REPO_NAMESPACE \
@@ -144,7 +144,7 @@ update_helm:
   script:
     - cd $REPO
     - |
-      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|FuelConsumption\.py|requirements\.txt)$'; then
+      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|WindPrediction\.py|requirements\.txt)$'; then
         sed -i 's/\(  service_image_tag: "\)\(.*\)/\1'"$TAG"'"/g' cookiecutter-config.yaml
         git config user.email "federico.fornari@ecmwf.int"
         git config user.name "Cookiecutter"
@@ -154,7 +154,7 @@ update_helm:
       fi
     - dagger call update
       --gitlab $GITLAB
-      --repo $REPO-fc
+      --repo $REPO-wp
       --branch $SERVICE-uc
       --username $CI_COOKIECUTTER_USERNAME
       --password env:CI_COOKIECUTTER_PASSWORD
@@ -171,8 +171,8 @@ sync_helm:
   artifacts:
     untracked: true
   script:
-    - rm -rf $HELM/$SERVICE-$REPO-fc
-    - cp -r /builds/$REPO_NAMESPACE/$REPO/$SERVICE-helm $HELM/$SERVICE-$REPO-fc
+    - rm -rf $HELM/$SERVICE-$REPO-wp
+    - cp -r /builds/$REPO_NAMESPACE/$REPO/$SERVICE-helm $HELM/$SERVICE-$REPO-wp
     - cd $HELM
     - git config user.email "federico.fornari@ecmwf.int"
     - git config user.name "Cookiecutter"
@@ -186,7 +186,7 @@ clean_registry:
   script:
     - cd $REPO
     - |
-      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|FuelConsumption\.py|requirements\.txt)$'; then
+      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|WindPrediction\.py|requirements\.txt)$'; then
         dagger call clean \
         --bucket $BUCKET \
         --endpoint https://$MINIO \

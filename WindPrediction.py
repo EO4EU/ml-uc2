@@ -123,33 +123,24 @@ def create_app():
                         if s3_path.endswith('/'):
                               s3_path=s3_path[:-1]
                         cp = CloudPath("s3://"+s3_bucket_output+'/'+s3_path+'/', client=clientS3)
-                        cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/')
-                        app.logger.warning("path is s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/')
+                        cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc2-WindPrediction/')
+                        app.logger.warning("path is s3://"+s3_bucket_output+'/result-uc2-WindPrediction/')
+
+                        std = 27.928453
+                        mean = 274.94165
 
                         with cpOutput.joinpath('log.txt').open('w') as fileOutput:
                               log_function = functools.partial(log,fileOutput)
                               
-                              to_treat={}
                               for folder in cp.iterdir():
                                     if folder.name.endswith('.npy'):
                                           data=np.load(folder)
-                                          def split_sequence(sequence, n_steps):
-                                                X = []
-                                                for i in range(len(sequence)):
-                                                      # find the end of this pattern
-                                                      end_ix = i + n_steps
-                                                      # check if we are beyond the dataset
-                                                      if end_ix > len(sequence)-1:
-                                                            break
-                                                      # gather input
-                                                      seq_x = sequence[i:end_ix]
-                                                      dic={'input':seq_x}
-                                                      X.append(dic)
-                                                return X
-                                          input_data=split_sequence(data,15)
-                                          asyncio.run(doInference(input_data,log_function))
+                                          input=[]
+                                          for i in range(0,data.shape[0]):
+                                                input.append({"input":(data[i,:,:,:]-mean)/std})
+                                          asyncio.run(doInference(input,log_function))
                                           array=[]
-                                          for elem in input_data:
+                                          for elem in input:
                                                 array.append(elem["result"])
                                           array=np.array(array)
                                           log_function('Output'+str(array.shape))
@@ -164,7 +155,7 @@ def create_app():
                               response_json ={
                               "previous_component_end": "True",
                               "S3_bucket_desc": {
-                                    "folder": "result-uc2-FuelConsumption","filename": ""
+                                    "folder": "result-uc2-WindPrediction","filename": ""
                               },
                               "meta_information": json_data_request.get('meta_information',{})}
                               Producer.send(kafka_out,key='key',value=response_json)
@@ -208,13 +199,13 @@ def create_app():
                         count=task[1]
                         inputs=[]
                         outputs=[]
-                        input=np.zeros([length,toInfer[count]["input"].shape[0],toInfer[count]["input"].shape[1]],dtype=np.float32)
+                        input=np.zeros([length,toInfer[count]["input"].shape[0],toInfer[count]["input"].shape[1],toInfer[count]["input"].shape[2]],dtype=np.float32)
                         for i in range(0,length):
                               input[i,:,:]=toInfer[count+i]["input"]
-                        inputs.append(httpclient.InferInput('lstm_input',input.shape, "FP32"))
+                        inputs.append(httpclient.InferInput('conv2d_input',input.shape, "FP32"))
                         inputs[0].set_data_from_numpy(input, binary_data=True)
                         outputs.append(httpclient.InferRequestedOutput('dense_2', binary_data=True))
-                        results = await triton_client.infer('vessel_4_new',inputs,outputs=outputs)
+                        results = await triton_client.infer('CNN_wind_speed',inputs,outputs=outputs)
                         return (task,results)
                   except Exception as e:
                         log_function('Got exception '+str(e))
@@ -246,9 +237,9 @@ def create_app():
             def producer():
                   total=len(toInfer)
                   count=0
-                  while total-count>=255:
-                        yield (255,count)
-                        count=count+255
+                  while total-count>=100:
+                        yield (100,count)
+                        count=count+100
                   yield (total-count,count)
             
             last_shown=time.time()

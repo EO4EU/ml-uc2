@@ -1,5 +1,5 @@
 FROM python:3.12.2-bullseye
-ENV FLASK_APP=FuelConsumption.py
+ENV FLASK_APP=WindPrediction.py
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 COPY . /app
 WORKDIR /app
