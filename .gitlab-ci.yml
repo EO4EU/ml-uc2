@@ -11,7 +11,7 @@
     APP: eo4eu-fuelconsumption
     SERVICE: inference-server
     HELM: helm-repo
-    REPO_BRANCH: main
+    REPO_BRANCH: FuelConsumption
     HELM_BRANCH: main
   before_script:
     - "apk --no-cache add jq"
