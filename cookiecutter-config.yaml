@@ -5,7 +5,7 @@ default_context:
   need_dep_chart: "no"
   include_service: "yes"
   service_name: "windprediction"
-  service_image_repo: "registry.apps.eo4eu.eu/eo4eu/eo4eu-cicd/eo4eu-inference-server/uc2/eo4eu-windprediction"
+  service_image_repo: "registry.apps.eo4eu.eu/eo4eu/eo4eu-inference-server/uc2/eo4eu-windprediction"
   service_image_tag: "e274f4e27f065d8b4693dd579d1a8f0ec692ad1a"
   service_image_pull_policy: "Always"
   service_image_secret: "uc2-registry"
