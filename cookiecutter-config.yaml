@@ -6,7 +6,7 @@ default_context:
   include_service: "yes"
   service_name: "fuelconsumption"
   service_image_repo: "registry.apps.eo4eu.eu/eo4eu/eo4eu-inference-server/uc2/eo4eu-fuelconsumption"
-  service_image_tag: "5882f12467bcdef7493f5baaf23c0a3247be096b"
+  service_image_tag: "6a9651816c301c79f9e4ab4fc69503d69b51b6bf"
   service_image_pull_policy: "Always"
   service_image_secret: "uc2-registry"
   service_container_port: "8080"
