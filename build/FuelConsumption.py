@@ -61,7 +61,7 @@ def create_app():
       app.logger.addHandler(handler)
       app.logger.addHandler(console_handler)
       app.logger.setLevel(logging.DEBUG)
-      logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.UC2.FuelConsumption'},mergeExtra=True)
+      logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.UC2.FuelConsumption'},merge_extra=True)
       logger_app.info("Application Starting up...", extra={'status': 'INFO'})
 
       # This is the entry point for the SSL model from Image to Feature service.
@@ -102,7 +102,7 @@ def create_app():
                   workflow_name = json_data_request.get('workflow_name', '')
                   bootstrapServers =api_response.data['bootstrapServers']
                   Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
-                  logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer})
+                  logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
                   logger_workflow.info('Starting Workflow',extra={'status':'START'})
                   logger_workflow.info('Json data request'+str(json_data_request),extra={'status': 'INFO'})
                   logger_workflow.info('Reading json data configmap'+str(json_data_configmap),extra={'status': 'INFO'})
