@@ -11,4 +11,3 @@ aiofiles
 aiomonitor
 Werkzeug
 pandas
-logging >= 3.13.1
