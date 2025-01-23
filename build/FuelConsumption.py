@@ -53,7 +53,7 @@ def create_app():
       app = Flask(__name__)
 
       Producer=KafkaProducer(bootstrap_servers="kafka-external.apps.eo4eu.eu:9092",value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
-      handler = KafkaHandler(producer=Producer,source='ML.UC2.FuelConsumption')
+      handler = KafkaHandler(producer=Producer)
       console_handler = logging.StreamHandler()
       console_handler.setLevel(logging.DEBUG)
       filter = DefaultContextFilter()
@@ -61,7 +61,8 @@ def create_app():
       app.logger.addHandler(handler)
       app.logger.addHandler(console_handler)
       app.logger.setLevel(logging.DEBUG)
-      app.logger.info("Starting up...", extra={'logName': 'startup'})
+      logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.UC2.FuelConsumption'},mergeExtra=True)
+      logger_app.info("Application Starting up...", extra={'status': 'INFO'})
 
       # This is the entry point for the SSL model from Image to Feature service.
       # It will receive a message from the Kafka topic and then do the inference on the data.
@@ -86,7 +87,7 @@ def create_app():
 
       @app.route('/<name>', methods=['POST'])
       def cfactor(name):
-            app.logger.info('received request', extra={'logName': 'requestReceived'})
+            app.logger.info('received request')
             # TODO : Debugging message to remove in production.
             # Message received.
             response=None
@@ -95,15 +96,20 @@ def create_app():
                   api_instance = client.CoreV1Api()
                   configmap_name = str(name)
                   configmap_namespace = 'uc2'
-                  app.logger.info('Namespace '+str(configmap_namespace), extra={'logName': 'namespace'})
                   api_response = api_instance.read_namespaced_config_map(configmap_name, configmap_namespace)
                   json_data_request = json.loads(request.data)
                   json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
+                  workflow_name = json_data_request.get('workflow_name', '')
                   bootstrapServers =api_response.data['bootstrapServers']
                   Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
-                  app.logger.info('Reading json data request'+str(json_data_request), extra={'logName': 'jsonRequest'})
-                  app.logger.info('Reading json data configmap'+str(json_data_configmap), extra={'logName': 'jsonConfigmap'})
-                  assert json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']
+                  logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer})
+                  logger_workflow.info('Starting Workflow',extra={'status':'START'})
+                  logger_workflow.info('Json data request'+str(json_data_request),extra={'status': 'INFO'})
+                  logger_workflow.info('Reading json data configmap'+str(json_data_configmap),extra={'status': 'INFO'})
+                  if not(json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']):
+                        class PreviousComponentEndException(Exception):
+                              pass
+                        raise PreviousComponentEndException('Previous component did not end correctly')
                   kafka_out = json_data_configmap['Topics']["out"]
                   s3_access_key = json_data_configmap['S3_bucket']['aws_access_key_id']
                   s3_secret_key = json_data_configmap['S3_bucket']['aws_secret_access_key']
@@ -112,22 +118,20 @@ def create_app():
                   s3_region_endpoint = json_data_configmap['S3_bucket']['endpoint_url']
 
                   s3_path = json_data_request['S3_bucket_desc']['folder']
-                  #s3_file = json_data_request['S3_bucket_desc'].get('filename',None)
 
                   def threadentry():
-                        app.logger.info('All json data read', extra={'logName': 'jsonRead'})
+                        logger_workflow.info('Starting new thread, starting processing',extra={'status':'INFO'})                        
 
                         clientS3 = S3Client(aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key,endpoint_url=s3_region_endpoint)
                         clientS3.set_as_default_client()
 
-                        app.logger.info('Client is ready', extra={'logName': 'clientReady'})
+                        logger_workflow.info('S3Client is ready', extra={'status': 'INFO'})
                         nonlocal s3_path
                         if s3_path.endswith('/'):
                               s3_path=s3_path[:-1]
                         cp = CloudPath("s3://"+s3_bucket_output+'/'+s3_path+'/', client=clientS3)
                         cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/')
-                        app.logger.info("path is s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/')
-
+                        logger_workflow.info("s3path is s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/', extra={'status': 'INFO'})
                         
                         to_treat={}
                         for folder in cp.iterdir():
@@ -147,19 +151,19 @@ def create_app():
                                                 X.append(dic)
                                           return X
                                     input_data=split_sequence(data,15)
-                                    asyncio.run(doInference(input_data))
+                                    asyncio.run(doInference(input_data,logger_workflow))
                                     array=[]
                                     for elem in input_data:
                                           array.append(elem["result"])
                                     array=np.array(array)
-                                    app.logger.info('Output'+str(array.shape), extra={'logName': 'outputShape'})
+                                    logger_workflow.info('Output shape'+str(array.shape), extra={'status': 'INFO'})
                                     with cpOutput.joinpath(folder.name).open('wb') as fileOutput:
                                           np.save(fileOutput,array)
                                     with cpOutput.joinpath(folder.name+'.csv').open('w') as fileOutput:
                                           np.savetxt(fileOutput,array,delimiter=',')
 
-                        app.logger.info('Output written', extra={'logName': 'outputWritten'})
-                        app.logger.info('Connecting to Kafka', extra={'logName': 'kafkaConnect'})
+                        app.logger.info('Output written', extra={'status': 'INFO'})
+                        app.logger.info('Connecting to Kafka to send answer', extra={'status': 'INFO'})
 
                         response_json ={
                         "previous_component_end": "True",
@@ -176,13 +180,12 @@ def create_app():
                               })
 
             except Exception as e:
-                  app.logger.error('Got exception '+str(e), extra={'logName': 'exception'})
-                  app.logger.error(traceback.format_exc(), extra={'logName': 'exception'})
-                  app.logger.info('So we are ignoring the message', extra={'logName': 'ignore'})
+                  logger_workflow.error('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'So we are ignoring the message', extra={'status': 'CRITICAL'})
                   # HTTP answer that the message is malformed. This message will then be discarded only the fact that a sucess return code is returned is important.
                   response = make_response({
                   "msg": "There was a problem ignoring"
                   })
+            logger_workflow.info('workflow finished successfully',extra={'status':'SUCCESS'})
             return response
 
       # This function is used to do the inference on the data.
@@ -192,7 +195,7 @@ def create_app():
       # The result will be a json with the following fields:
       # model_name : The name of the model used.
       # outputs : The result of the inference.
-      async def doInference(toInfer):
+      async def doInference(toInfer,logger_workflow):
 
             triton_client = httpclient.InferenceServerClient(url="default-inference.uc2.svc.cineca-inference-server.local", verbose=False,conn_timeout=10000000,conn_limit=None,ssl=False)
             nb_Created=0
@@ -217,8 +220,7 @@ def create_app():
                         results = await triton_client.infer('vessel_4_new',inputs,outputs=outputs)
                         return (task,results)
                   except Exception as e:
-                        app.logger.error('Got exception '+str(e), extra={'logName': 'exception'})
-                        app.logger.error(traceback.format_exc(),extra={'logName': 'exception'})
+                        logger_workflow.error('Got exception in inference '+str(e)+'\n'+traceback.format_exc(), extra={'status': 'WARNING'})
                         nonlocal last_throw
                         last_throw=time.time()
                         return await consume(task)
@@ -262,10 +264,10 @@ def create_app():
                   nb_Created+=1
                   if time.time()-last_shown>60:
                         last_shown=time.time()
-                        app.logger.info('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'logName': 'progress'})
+                        logger_workflow.info('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'status': 'INFO'})
             while nb_InferenceDone-nb_Created>0 or nb_Postprocess-nb_InferenceDone>0:
                   await asyncio.sleep(0)
             await asyncio.gather(*list_task,*list_postprocess)
-            app.logger.info('Inference done',extra={'logName': 'progress'})
+            logger_workflow.info('Inference done',extra={'status': 'INFO'})
             await triton_client.close()
       return app
