@@ -88,8 +88,6 @@ def create_app():
       @app.route('/<name>', methods=['POST'])
       def cfactor(name):
             app.logger.info('received request')
-            # TODO : Debugging message to remove in production.
-            # Message received.
             response=None
             try:
                   config.load_incluster_config()
