@@ -96,7 +96,7 @@ def create_app():
                   api_response = api_instance.read_namespaced_config_map(configmap_name, configmap_namespace)
                   json_data_request = json.loads(request.data)
                   json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
-                  workflow_name = json_data_request.get('workflow_name', '')
+                  workflow_name = json_data_configmap.get('workflow_name', '')
                   bootstrapServers =api_response.data['bootstrapServers']
                   Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
                   logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
@@ -173,6 +173,7 @@ def create_app():
                               Producer.flush()
                         except Exception as e:
                               logger_workflow.error('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'So we are ignoring the message', extra={'status': 'CRITICAL'})
+                              return
                         logger_workflow.info('workflow finished successfully',extra={'status':'SUCCESS'})
                   thread = threading.Thread(target=threadentry)
                   thread.start()
