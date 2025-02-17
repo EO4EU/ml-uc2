@@ -59,7 +59,7 @@
     - "export TAG=$(git -C $REPO rev-parse HEAD)"
 update_domain:
   extends: [.dagger]
-  tags: [dagger]
+  tags: [dagger, uc2]
   stage: .pre
   script:
     - cd $REPO
@@ -77,7 +77,7 @@ update_domain:
       fi
 build_image:
   extends: [.dagger]
-  tags: [dagger]
+  tags: [dagger, uc2]
   stage: build
   needs: [update_domain]
   script:
@@ -95,7 +95,7 @@ build_image:
       fi
 scan_image:
   extends: [.dagger]
-  tags: [dagger]
+  tags: [dagger, uc2]
   stage: test
   needs: [build_image]
   dependencies: [build_image]
@@ -124,7 +124,7 @@ scan_image:
       - vulnerabilities.html
 push_image:
   extends: [.dagger]
-  tags: [dagger]
+  tags: [dagger, uc2]
   stage: deploy
   needs: [scan_image]
   script:
@@ -148,7 +148,7 @@ push_image:
       fi
 update_helm:
   extends: [.dagger]
-  tags: [dagger]
+  tags: [dagger, uc2]
   stage: .post
   needs: [push_image]
   artifacts:
@@ -176,7 +176,7 @@ update_helm:
       /builds/$REPO_NAMESPACE/$REPO/$SERVICE-helm
 sync_helm:
   extends: [.dagger]
-  tags: [dagger]
+  tags: [dagger, uc2]
   stage: .post
   needs: [update_helm]
   dependencies: [update_helm]
@@ -193,7 +193,7 @@ sync_helm:
     - git push
 clean_registry:
   extends: [.dagger]
-  tags: [dagger]
+  tags: [dagger, uc2]
   stage: .post
   script:
     - cd $REPO
