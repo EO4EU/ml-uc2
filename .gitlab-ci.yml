@@ -17,7 +17,7 @@
     variables: 
       REPO_BRANCH: FuelConsumption
       HELM_BRANCH: main
-  - if: $CI_COMMIT_BRANCH == "backup"
+  - if: $CI_COMMIT_BRANCH == "FuelConsumption-backup"
     variables:
       REPO_BRANCH: FuelConsumption-backup
       HELM_BRANCH: backup
