@@ -1,6 +1,10 @@
 FROM python:3.13.1-bookworm
 ENV FLASK_APP=FuelConsumption.py
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get update && \
+    apt-get install ffmpeg \
+    libsm6 \
+    libxext6 \
+    -y
 COPY . /app
 WORKDIR /app
 RUN pip install -r requirements.txt
