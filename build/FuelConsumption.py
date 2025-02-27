@@ -151,14 +151,16 @@ def create_app():
                                           input_data=split_sequence(data,15)
                                           asyncio.run(doInference(input_data,logger_workflow))
                                           array=[]
+                                          i=0
                                           for elem in input_data:
-                                                array.append(elem["result"])
+                                                array.append([i,elem["result"]])
+                                                i=i+1
                                           array=np.array(array)
                                           logger_workflow.info('Output shape'+str(array.shape), extra={'status': 'DEBUG'})
                                           with cpOutput.joinpath(folder.name).open('wb') as fileOutput:
                                                 np.save(fileOutput,array)
                                           with cpOutput.joinpath(folder.name+'.csv').open('w') as fileOutput:
-                                                np.savetxt(fileOutput,array,delimiter=',')
+                                                np.savetxt(fileOutput,array,delimiter=',',header='id,consumption')
 
                               app.logger.info('Output written', extra={'status': 'DEBUG'})
                               app.logger.info('Connecting to Kafka to send answer', extra={'status': 'DEBUG'})
