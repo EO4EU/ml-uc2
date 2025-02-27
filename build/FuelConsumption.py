@@ -153,8 +153,10 @@ def create_app():
                                           array=[]
                                           i=0
                                           for elem in input_data:
+                                                logger_workflow.info('result shape'+str(elem["result"]), extra={'status': 'DEBUG'})
                                                 array.append([i,elem["result"]])
                                                 i=i+1
+                                          logger_workflow.info('array '+str(array), extra={'status': 'DEBUG'})
                                           array=np.array(array)
                                           logger_workflow.info('Output shape'+str(array.shape), extra={'status': 'DEBUG'})
                                           with cpOutput.joinpath(folder.name).open('wb') as fileOutput:
