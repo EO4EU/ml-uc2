@@ -11,14 +11,16 @@
     APP: eo4eu-windprediction
     SERVICE: eo4eu-inference-server
     HELM: helm-repo
-    REPO_BRANCH: WindPrediction
-    HELM_BRANCH: main
     COOKIECUTTER_BRANCH: inference-server-uc
   rules:
   - if: $CI_COMMIT_BRANCH == "WindPrediction"
     variables: 
       REPO_BRANCH: WindPrediction
       HELM_BRANCH: main
+  - if: $CI_COMMIT_BRANCH == "WindPrediction-dev"
+    variables: 
+      REPO_BRANCH: WindPrediction-dev
+      HELM_BRANCH: dev
   - if: $CI_COMMIT_BRANCH == "WindPrediction-backup"
     variables:
       REPO_BRANCH: WindPrediction-backup
