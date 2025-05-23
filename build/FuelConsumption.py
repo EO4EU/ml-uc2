@@ -61,8 +61,8 @@ def create_app():
       app.logger.addHandler(handler)
       app.logger.addHandler(console_handler)
       app.logger.setLevel(logging.DEBUG)
-      logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.UC2.FuelConsumption'},merge_extra=True)
-      logger_app.info("Application Starting up...", extra={'status': 'INFO'})
+      
+      #logger_app.info("Application Starting up...", extra={'status': 'INFO'})
 
       # This is the entry point for the SSL model from Image to Feature service.
       # It will receive a message from the Kafka topic and then do the inference on the data.
@@ -99,10 +99,6 @@ def create_app():
                   workflow_name = json_data_configmap.get('workflow_name', '')
                   bootstrapServers =api_response.data['bootstrapServers']
                   Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
-                  logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
-                  logger_workflow.info('Starting Workflow',extra={'status':'START'})
-                  logger_workflow.info('Json data request'+str(json_data_request),extra={'status': 'DEBUG'})
-                  logger_workflow.info('Reading json data configmap'+str(json_data_configmap),extra={'status': 'DEBUG'})
                   if not(json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']):
                         class PreviousComponentEndException(Exception):
                               pass
@@ -113,7 +109,12 @@ def create_app():
                   s3_bucket_output = json_data_configmap['S3_bucket']['s3-bucket-name']
                   s3_region = json_data_configmap['S3_bucket']['region_name']
                   s3_region_endpoint = json_data_configmap['S3_bucket']['endpoint_url']
-
+                  component_name = json_data_configmap['ML']['component_name']
+                  logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.'+component_name},merge_extra=True)
+                  logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
+                  logger_workflow.info('Starting Workflow',extra={'status':'START'})
+                  logger_workflow.info('Json data request'+str(json_data_request),extra={'status': 'DEBUG'})
+                  logger_workflow.info('Reading json data configmap'+str(json_data_configmap),extra={'status': 'DEBUG'})
                   s3_path = json_data_request['S3_bucket_desc']['folder']
 
                   def threadentry():
