@@ -1,7 +1,7 @@
 default_context:
   chart_name: "uc2-fc"
   chart_namespace: "uc2"
-  chart_version: "0.2.16"
+  chart_version: "0.2.17"
   need_dep_chart: "no"
   include_service: "yes"
   service_name: "fuelconsumption"
@@ -20,6 +20,7 @@ default_context:
   include_inference_service: "yes"
   inference_service_storage_uri: "s3://inference-server-bucket/UC2/default"
   include_sklearn_inference_service: "no"
+  include_sklearn_virtual_service2: "no"
   include_namespace: "yes"
   include_role: "yes"
   include_role_binding: "yes"
