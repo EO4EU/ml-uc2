@@ -1,7 +1,7 @@
 default_context:
   chart_name: "uc2-wp"
   chart_namespace: "uc2"
-  chart_version: "0.2.3"
+  chart_version: "0.2.4"
   need_dep_chart: "no"
   include_service: "yes"
   service_name: "windprediction"
@@ -19,6 +19,7 @@ default_context:
   service_component_label: "windprediction"
   include_inference_service: "no"
   include_sklearn_inference_service: "no"
+  include_sklearn_inference_service2: "no"
   include_namespace: "no"
   include_role: "no"
   include_role_binding: "no"
