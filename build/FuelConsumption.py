@@ -98,7 +98,12 @@ def create_app():
                   json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
                   workflow_name = json_data_configmap.get('workflow_name', '')
                   bootstrapServers =api_response.data['bootstrapServers']
-                  Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+                  while True:
+                        try:
+                              Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+                              break
+                        except Exception as e:
+                              app.logger.warning('Got exception when connecting to Kafka'+str(e)+'\n'+traceback.format_exc()+'\n'+'So we retry')
                   if not(json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']):
                         class PreviousComponentEndException(Exception):
                               pass
