@@ -51,16 +51,6 @@ from KafkaHandler import KafkaHandler,DefaultContextFilter
 def create_app():
 
       app = Flask(__name__)
-
-      Producer=KafkaProducer(bootstrap_servers="kafka-external.apps.eo4eu.eu:9092",value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
-      handler = KafkaHandler(defaultproducer=Producer)
-      console_handler = logging.StreamHandler()
-      console_handler.setLevel(logging.DEBUG)
-      filter = DefaultContextFilter()
-      app.logger.addFilter(filter)
-      app.logger.addHandler(handler)
-      app.logger.addHandler(console_handler)
-      app.logger.setLevel(logging.DEBUG)
       
       #logger_app.info("Application Starting up...", extra={'status': 'INFO'})
 
@@ -101,6 +91,14 @@ def create_app():
                   while True:
                         try:
                               Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+                              handler = KafkaHandler(defaultproducer=Producer)
+                              console_handler = logging.StreamHandler()
+                              console_handler.setLevel(logging.DEBUG)
+                              filter = DefaultContextFilter()
+                              app.logger.addFilter(filter)
+                              app.logger.addHandler(handler)
+                              app.logger.addHandler(console_handler)
+                              app.logger.setLevel(logging.DEBUG)
                               break
                         except Exception as e:
                               app.logger.warning('Got exception when connecting to Kafka'+str(e)+'\n'+traceback.format_exc()+'\n'+'So we retry')
