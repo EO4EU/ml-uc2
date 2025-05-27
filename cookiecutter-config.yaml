@@ -1,7 +1,7 @@
 default_context:
   chart_name: "uc2-wp"
   chart_namespace: "uc2"
-  chart_version: "0.2.5"
+  chart_version: "0.2.6"
   need_dep_chart: "no"
   include_service: "yes"
   service_name: "windprediction"

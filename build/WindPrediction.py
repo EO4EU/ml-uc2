@@ -51,18 +51,7 @@ from KafkaHandler import KafkaHandler,DefaultContextFilter
 def create_app():
 
       app = Flask(__name__)
-
-      Producer=KafkaProducer(bootstrap_servers="kafka-external.dev.apps.eo4eu.eu:9092",value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
-      handler = KafkaHandler(defaultproducer=Producer)
-      console_handler = logging.StreamHandler()
-      console_handler.setLevel(logging.DEBUG)
-      filter = DefaultContextFilter()
-      app.logger.addFilter(filter)
-      app.logger.addHandler(handler)
-      app.logger.addHandler(console_handler)
-      app.logger.setLevel(logging.DEBUG)
-      logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.UC2.WindPrediction'},merge_extra=True)
-      logger_app.info("Application Starting up...", extra={'status': 'DEBUG'})
+      app.logger.info("Application Starting up...", extra={'status': 'DEBUG'})
 
       # This is the entry point for the SSL model from Image to Feature service.
       # It will receive a message from the Kafka topic and then do the inference on the data.
@@ -87,7 +76,7 @@ def create_app():
 
       @app.route('/<name>', methods=['POST'])
       def cfactor(name):
-            logger_app.info('received request',extra={'status': 'INFO'})
+            app.logger.info('received request',extra={'status': 'INFO'})
             # TODO : Debugging message to remove in production.
             # Message received.
             response=None
@@ -102,7 +91,23 @@ def create_app():
                   json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
                   workflow_name = json_data_configmap.get('workflow_name', '')
                   bootstrapServers =api_response.data['bootstrapServers']
-                  Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+                  component_name = json_data_configmap['ML']['component_name']
+                  while True:
+                        try:
+                              Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+                              handler = KafkaHandler(defaultproducer=Producer)
+                              console_handler = logging.StreamHandler()
+                              console_handler.setLevel(logging.DEBUG)
+                              filter = DefaultContextFilter()
+                              app.logger.addFilter(filter)
+                              app.logger.addHandler(handler)
+                              app.logger.addHandler(console_handler)
+                              app.logger.setLevel(logging.DEBUG)
+                              logger_app = logging.LoggerAdapter(app.logger, {'source': component_name},merge_extra=True)
+                              break
+                        except Exception as e:
+                              app.logger.warning('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'Retrying to connect to Kafka', extra={'status': 'WARNING'})
+
                   logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
                   logger_workflow.info('Starting Workflow',extra={'status':'START'})
                   logger_workflow.info('Reading json data request'+str(json_data_request),extra={'status': 'DEBUG'})
