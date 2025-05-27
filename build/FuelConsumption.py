@@ -113,7 +113,7 @@ def create_app():
                   s3_region = json_data_configmap['S3_bucket']['region_name']
                   s3_region_endpoint = json_data_configmap['S3_bucket']['endpoint_url']
                   component_name = json_data_configmap['ML']['component_name']
-                  logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.'+component_name},merge_extra=True)
+                  logger_app = logging.LoggerAdapter(app.logger, {'source': component_name},merge_extra=True)
                   logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
                   logger_workflow.info('Starting Workflow',extra={'status':'START'})
                   logger_workflow.info('Json data request'+str(json_data_request),extra={'status': 'DEBUG'})
