@@ -51,6 +51,13 @@ from KafkaHandler import KafkaHandler,DefaultContextFilter
 def create_app():
 
       app = Flask(__name__)
+      app.logger.setLevel(logging.DEBUG)
+      handler = KafkaHandler()
+      handler.setLevel(logging.INFO)
+      filter = DefaultContextFilter()
+      app.logger.addHandler(handler)
+      app.logger.addFilter(filter)
+      app.logger.info("Application Starting up...", extra={'status': 'DEBUG'})
       
       #logger_app.info("Application Starting up...", extra={'status': 'INFO'})
 
@@ -79,61 +86,52 @@ def create_app():
       def cfactor(name):
             response=None
             try:
-                  config.load_incluster_config()
-                  api_instance = client.CoreV1Api()
-                  configmap_name = str(name)
-                  configmap_namespace = 'uc2'
-                  api_response = api_instance.read_namespaced_config_map(configmap_name, configmap_namespace)
-                  json_data_request = json.loads(request.data)
-                  json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
-                  workflow_name = json_data_configmap.get('workflow_name', '')
-                  bootstrapServers =api_response.data['bootstrapServers']
-                  while True:
+                  raw_data = request.data
+                  def threadentry(raw_data):
+                        config.load_incluster_config()
+                        api_instance = client.CoreV1Api()
+                        configmap_name = str(name)
+                        configmap_namespace = 'uc2'
+                        api_response = api_instance.read_namespaced_config_map(configmap_name, configmap_namespace)
+                        json_data_request = json.loads(raw_data)
+                        json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
+                        workflow_name = json_data_configmap.get('workflow_name', '')
+                        bootstrapServers =api_response.data['bootstrapServers']
+                        while True:
+                              try:
+                                    Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+                                    break
+                              except Exception as e:
+                                    app.logger.warning('Got exception when connecting to Kafka'+str(e)+'\n'+traceback.format_exc()+'\n'+'So we retry')
                         try:
-                              Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
-                              handler = KafkaHandler(defaultproducer=Producer)
-                              console_handler = logging.StreamHandler()
-                              console_handler.setLevel(logging.DEBUG)
-                              filter = DefaultContextFilter()
-                              app.logger.addFilter(filter)
-                              app.logger.addHandler(handler)
-                              app.logger.addHandler(console_handler)
-                              app.logger.setLevel(logging.DEBUG)
-                              break
-                        except Exception as e:
-                              app.logger.warning('Got exception when connecting to Kafka'+str(e)+'\n'+traceback.format_exc()+'\n'+'So we retry')
-                  if not(json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']):
-                        class PreviousComponentEndException(Exception):
-                              pass
-                        raise PreviousComponentEndException('Previous component did not end correctly')
-                  kafka_out = json_data_configmap['Topics']["out"]
-                  s3_access_key = json_data_configmap['S3_bucket']['aws_access_key_id']
-                  s3_secret_key = json_data_configmap['S3_bucket']['aws_secret_access_key']
-                  s3_bucket_output = json_data_configmap['S3_bucket']['s3-bucket-name']
-                  s3_region = json_data_configmap['S3_bucket']['region_name']
-                  s3_region_endpoint = json_data_configmap['S3_bucket']['endpoint_url']
-                  component_name = json_data_configmap['ML']['component_name']
-                  logger_app = logging.LoggerAdapter(app.logger, {'source': component_name},merge_extra=True)
-                  logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
-                  logger_workflow.info('Starting Workflow',extra={'status':'START'})
-                  logger_workflow.info('Json data request'+str(json_data_request),extra={'status': 'DEBUG'})
-                  logger_workflow.info('Reading json data configmap'+str(json_data_configmap),extra={'status': 'DEBUG'})
-                  s3_path = json_data_request['S3_bucket_desc']['folder']
+                              logger_workflow = logging.LoggerAdapter(app.logger, {'source': component_name,'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
+                              if not(json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']):
+                                    class PreviousComponentEndException(Exception):
+                                          pass
+                                    raise PreviousComponentEndException('Previous component did not end correctly')
+                              kafka_out = json_data_configmap['Topics']["out"]
+                              s3_access_key = json_data_configmap['S3_bucket']['aws_access_key_id']
+                              s3_secret_key = json_data_configmap['S3_bucket']['aws_secret_access_key']
+                              s3_bucket_output = json_data_configmap['S3_bucket']['s3-bucket-name']
+                              s3_region = json_data_configmap['S3_bucket']['region_name']
+                              s3_region_endpoint = json_data_configmap['S3_bucket']['endpoint_url']
+                              component_name = json_data_configmap['ML']['component_name']
+                              logger_workflow.info('Starting Workflow',extra={'status':'START'})
+                              logger_workflow.debug('Json data request'+str(json_data_request),extra={'status': 'DEBUG'})
+                              logger_workflow.debug('Reading json data configmap'+str(json_data_configmap),extra={'status': 'DEBUG'})
+                              s3_path = json_data_request['S3_bucket_desc']['folder']
 
-                  def threadentry():
-                        try:
-                              logger_workflow.info('Starting new thread, starting processing',extra={'status':'DEBUG'})                        
+                              logger_workflow.debug('Starting new thread, starting processing',extra={'status':'DEBUG'})                        
 
                               clientS3 = S3Client(aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key,endpoint_url=s3_region_endpoint)
                               clientS3.set_as_default_client()
 
-                              logger_workflow.info('S3Client is ready', extra={'status': 'INFO'})
-                              nonlocal s3_path
+                              logger_workflow.debug('S3Client is ready', extra={'status': 'INFO'})
                               if s3_path.endswith('/'):
                                     s3_path=s3_path[:-1]
                               cp = CloudPath("s3://"+s3_bucket_output+'/'+s3_path+'/', client=clientS3)
                               cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/')
-                              logger_workflow.info("s3path is s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/', extra={'status': 'DEBUG'})
+                              logger_workflow.debug("s3path is s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/', extra={'status': 'DEBUG'})
                               
                               to_treat={}
                               for folder in cp.iterdir():
@@ -162,7 +160,7 @@ def create_app():
                                                 i=i+1
                                           #logger_workflow.info('array '+str(array), extra={'status': 'DEBUG'})
                                           array=np.array(array)
-                                          logger_workflow.info('Output shape'+str(array.shape), extra={'status': 'DEBUG'})
+                                          logger_workflow.debug('Output shape'+str(array.shape), extra={'status': 'DEBUG'})
                                           with cpOutput.joinpath(folder.name).open('wb') as fileOutput:
                                                 np.save(fileOutput,array)
                                           with cpOutput.joinpath(folder.name+'.csv').open('w') as fileOutput:
@@ -183,13 +181,13 @@ def create_app():
                               logger_workflow.error('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'So we are ignoring the message', extra={'status': 'CRITICAL'})
                               return
                         logger_workflow.info('workflow finished successfully',extra={'status':'SUCCESS'})
-                  thread = threading.Thread(target=threadentry)
+                  thread = threading.Thread(target=threadentry, args=(raw_data,))
                   thread.start()
                   response = make_response({
                               "msg": "Started the process"
                               })
             except Exception as e:
-                  logger_workflow.error('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'So we are ignoring the message', extra={'status': 'CRITICAL'})
+                  app.logger.error('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'So we are ignoring the message', extra={'status': 'CRITICAL'})
                   # HTTP answer that the message is malformed. This message will then be discarded only the fact that a sucess return code is returned is important.
                   response = make_response({
                   "msg": "There was a problem ignoring"
@@ -228,7 +226,7 @@ def create_app():
                         results = await triton_client.infer('vessel_4_new',inputs,outputs=outputs)
                         return (task,results)
                   except Exception as e:
-                        logger_workflow.error('Got exception in inference '+str(e)+'\n'+traceback.format_exc(), extra={'status': 'WARNING'})
+                        logger_workflow.debug('Got exception in inference '+str(e)+'\n'+traceback.format_exc(), extra={'status': 'WARNING'})
                         nonlocal last_throw
                         last_throw=time.time()
                         return await consume(task)
@@ -272,10 +270,10 @@ def create_app():
                   nb_Created+=1
                   if time.time()-last_shown>60:
                         last_shown=time.time()
-                        logger_workflow.info('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'status': 'DEBUG'})
+                        logger_workflow.debug('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'status': 'DEBUG'})
             while nb_InferenceDone-nb_Created>0 or nb_Postprocess-nb_InferenceDone>0:
                   await asyncio.sleep(0)
             await asyncio.gather(*list_task,*list_postprocess)
-            logger_workflow.info('Inference done',extra={'status': 'DEBUG'})
+            logger_workflow.debug('Inference done',extra={'status': 'DEBUG'})
             await triton_client.close()
       return app
