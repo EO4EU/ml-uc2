@@ -97,7 +97,7 @@ def create_app():
                         configmap_namespace = 'uc2'
                         app.logger.info('Namespace '+str(configmap_namespace),extra={'logName': 'namespace'})
                         api_response = api_instance.read_namespaced_config_map(configmap_name, configmap_namespace)
-                        json_data_request = json.loads(request.data)
+                        json_data_request = json.loads(raw_data)
                         json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
                         workflow_name = json_data_configmap.get('workflow_name', '')
                         bootstrapServers =api_response.data['bootstrapServers']
