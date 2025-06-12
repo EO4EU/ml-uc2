@@ -104,7 +104,6 @@ def create_app():
                               except Exception as e:
                                     app.logger.warning('Got exception when connecting to Kafka'+str(e)+'\n'+traceback.format_exc()+'\n'+'So we retry')
                         try:
-                              logger_workflow = logging.LoggerAdapter(app.logger, {'source': component_name,'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
                               if not(json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']):
                                     class PreviousComponentEndException(Exception):
                                           pass
@@ -116,6 +115,7 @@ def create_app():
                               s3_region = json_data_configmap['S3_bucket']['region_name']
                               s3_region_endpoint = json_data_configmap['S3_bucket']['endpoint_url']
                               component_name = json_data_configmap['ML']['component_name']
+                              logger_workflow = logging.LoggerAdapter(app.logger, {'source': component_name,'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
                               logger_workflow.info('Starting Workflow',extra={'status':'START'})
                               logger_workflow.debug('Json data request'+str(json_data_request),extra={'status': 'DEBUG'})
                               logger_workflow.debug('Reading json data configmap'+str(json_data_configmap),extra={'status': 'DEBUG'})
