@@ -243,6 +243,7 @@ def create_app():
                         return await consume(task)
             
             async def postprocess(task,results):
+                  nonlocal nb_line_done
                   length=task[0]
                   result=results.as_numpy('dense_2')
                   for i in range(0,length):
