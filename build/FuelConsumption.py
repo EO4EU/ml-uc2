@@ -133,38 +133,49 @@ def create_app():
                               cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/')
                               logger_workflow.debug("s3path is s3://"+s3_bucket_output+'/result-uc2-FuelConsumption/', extra={'status': 'DEBUG'})
                               
-                              to_treat={}
-                              for folder in cp.iterdir():
-                                    if folder.name.endswith('.npy'):
-                                          data=np.load(folder)
-                                          def split_sequence(sequence, n_steps):
-                                                X = []
-                                                for i in range(len(sequence)):
-                                                      # find the end of this pattern
-                                                      end_ix = i + n_steps
-                                                      # check if we are beyond the dataset
-                                                      if end_ix > len(sequence)-1:
-                                                            break
-                                                      # gather input
-                                                      seq_x = sequence[i:end_ix]
-                                                      dic={'input':seq_x}
-                                                      X.append(dic)
-                                                return X
-                                          input_data=split_sequence(data,15)
-                                          asyncio.run(doInference(input_data,logger_workflow))
-                                          array=[]
-                                          i=0
-                                          for elem in input_data:
-                                                #logger_workflow.info('result shape'+str(elem["result"]), extra={'status': 'DEBUG'})
-                                                array.append([i,elem["result"].item()])
-                                                i=i+1
-                                          #logger_workflow.info('array '+str(array), extra={'status': 'DEBUG'})
-                                          array=np.array(array)
-                                          logger_workflow.debug('Output shape'+str(array.shape), extra={'status': 'DEBUG'})
-                                          with cpOutput.joinpath(folder.name).open('wb') as fileOutput:
-                                                np.save(fileOutput,array)
-                                          with cpOutput.joinpath(folder.name+'.csv').open('w') as fileOutput:
-                                                np.savetxt(fileOutput,array,delimiter=',',header='id,consumption')
+                              to_treat=[]
+
+                              def list_folders(cp):
+                                    for item in cp.iterdir():
+                                          if item.name.endswith('.npy'):
+                                                to_treat.append(item)
+                                          list_folders(item)
+                              list_folders(cp)
+                              total_number=len(to_treat)
+                              file_timings = []  # Store actual processing time for each completed file
+                              for file_number,folder in enumerate(to_treat):
+                                    file_start_time = time.time()
+                                    data=np.load(folder)
+                                    def split_sequence(sequence, n_steps):
+                                          X = []
+                                          for i in range(len(sequence)):
+                                                # find the end of this pattern
+                                                end_ix = i + n_steps
+                                                # check if we are beyond the dataset
+                                                if end_ix > len(sequence)-1:
+                                                      break
+                                                # gather input
+                                                seq_x = sequence[i:end_ix]
+                                                dic={'input':seq_x}
+                                                X.append(dic)
+                                          return X
+                                    input_data=split_sequence(data,15)
+                                    asyncio.run(doInference(input_data,logger_workflow,file_number,total_number,file_timings))
+                                    array=[]
+                                    i=0
+                                    for elem in input_data:
+                                          #logger_workflow.info('result shape'+str(elem["result"]), extra={'status': 'DEBUG'})
+                                          array.append([i,elem["result"].item()])
+                                          i=i+1
+                                    #logger_workflow.info('array '+str(array), extra={'status': 'DEBUG'})
+                                    array=np.array(array)
+                                    logger_workflow.debug('Output shape'+str(array.shape), extra={'status': 'DEBUG'})
+                                    with cpOutput.joinpath(folder.name).open('wb') as fileOutput:
+                                          np.save(fileOutput,array)
+                                    with cpOutput.joinpath(folder.name+'.csv').open('w') as fileOutput:
+                                          np.savetxt(fileOutput,array,delimiter=',',header='id,consumption')
+                                    file_end_time = time.time()
+                                    file_timings.append(file_end_time - file_start_time)
 
                               app.logger.info('Output written', extra={'status': 'DEBUG'})
                               app.logger.info('Connecting to Kafka to send answer', extra={'status': 'DEBUG'})
@@ -197,11 +208,9 @@ def create_app():
       # This function is used to do the inference on the data.
       # It will connect to the triton server and send the data to it.
       # The result will be returned.
-      # The data should be a numpy array of shape (1,10,120,120) and type float32.
-      # The result will be a json with the following fields:
       # model_name : The name of the model used.
       # outputs : The result of the inference.
-      async def doInference(toInfer,logger_workflow):
+      async def doInference(toInfer,logger_workflow,file_number,total_number,file_timings):
 
             triton_client = httpclient.InferenceServerClient(url="default-inference.uc2.svc.cineca-inference-server.local", verbose=False,conn_timeout=10000000,conn_limit=None,ssl=False)
             nb_Created=0
@@ -211,6 +220,8 @@ def create_app():
             list_postprocess=set()
             list_task=set()
             last_throw=0
+            nb_line_done=0
+            nb_line_total=len(toInfer)
             async def consume(task):
                   try:
                         length=task[0]
@@ -236,6 +247,7 @@ def create_app():
                   result=results.as_numpy('dense_2')
                   for i in range(0,length):
                         toInfer[task[1]+i]["result"]=result[i]
+                  nb_line_done+=length
 
             def postprocessTask(task):
                   list_task.discard(task)
@@ -271,6 +283,38 @@ def create_app():
                   if time.time()-last_shown>60:
                         last_shown=time.time()
                         logger_workflow.debug('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'status': 'DEBUG'})
+                        # Calculate time estimate for current file
+                        elapsed_time = time.time() - start + 60  # Add back the 60s offset
+                        if nb_line_done > 0:
+                              rate = nb_line_done / elapsed_time
+                              remaining_lines_current_file = nb_line_total - nb_line_done
+                              estimated_remaining_seconds_current_file = remaining_lines_current_file / rate if rate > 0 else 0
+                              # Estimate time for remaining files using actual timing data from completed files
+                              if len(file_timings) > 0:
+                                    # Use average of completed files for better accuracy
+                                    avg_time_per_file = sum(file_timings) / len(file_timings)
+                              else:
+                                    # Fallback to current file estimate if no completed files yet
+                                    avg_time_per_file = elapsed_time
+                              remaining_files = total_number - file_number - 1
+                              estimated_remaining_seconds_other_files = remaining_files * avg_time_per_file
+                              total_estimated_remaining = estimated_remaining_seconds_current_file + estimated_remaining_seconds_other_files
+                              hours = int(total_estimated_remaining // 3600)
+                              minutes = int((total_estimated_remaining % 3600) // 60)
+                              seconds = int(total_estimated_remaining % 60)
+                              time_estimate = f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s"
+                        elif nb_line_done == 0 and len(file_timings) > 0:
+                              # If no lines done yet, use average of completed files
+                              avg_time_per_file = sum(file_timings) / len(file_timings)
+                              remaining_files = total_number - file_number
+                              estimated_remaining_seconds_other_files = remaining_files * avg_time_per_file
+                              hours = int(estimated_remaining_seconds_other_files // 3600)
+                              minutes = int((estimated_remaining_seconds_other_files % 3600) // 60)
+                              seconds = int(estimated_remaining_seconds_other_files % 60)
+                              time_estimate = f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s"
+                        else:
+                              time_estimate = "calculating..."
+                        logger_workflow.info('Progress file '+str(file_number)+'/'+str(total_number)+' : '+str(nb_line_done)+'/' +str(nb_line_total)+' lines ('+str((nb_line_done*100)//nb_line_total)+' %) - Est. remaining: '+time_estimate, extra={'status': 'INFO', 'overwrite':True})
             while nb_InferenceDone-nb_Created>0 or nb_Postprocess-nb_InferenceDone>0:
                   await asyncio.sleep(0)
             await asyncio.gather(*list_task,*list_postprocess)
