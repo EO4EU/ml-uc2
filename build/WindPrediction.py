@@ -153,7 +153,7 @@ def create_app():
                                     list_folders(cp)
                                     total_number=len(to_treat)
                                     file_timings = []
-
+                                    logger_workflow.info('Estimating time ...', extra={'status': 'INFO'})
                                     for file_number, folder in enumerate(to_treat):
                                           file_start_time = time.time()
                                           data=np.load(folder)
