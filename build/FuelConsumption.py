@@ -141,6 +141,7 @@ def create_app():
                                                 to_treat.append(item)
                                           list_folders(item)
                               list_folders(cp)
+                              logger_workflow.info('Estimating times ...', extra={'status': 'INFO'})
                               total_number=len(to_treat)
                               file_timings = []  # Store actual processing time for each completed file
                               for file_number,folder in enumerate(to_treat):
