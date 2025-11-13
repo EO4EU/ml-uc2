@@ -59,7 +59,7 @@ def create_app():
       app.logger.addFilter(filter)
       app.logger.info("Application Starting up...", extra={'status': 'DEBUG'})
       
-      #logger_app.info("Application Starting up...", extra={'status': 'INFO'})
+      #logger_app.info("Application Starting up...", extra={'status': 'INFO'}) 
 
       # This is the entry point for the SSL model from Image to Feature service.
       # It will receive a message from the Kafka topic and then do the inference on the data.
