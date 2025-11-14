@@ -272,7 +272,8 @@ def create_app():
                   while total-count>=100:
                         yield (100,count)
                         count=count+100
-                  yield (total-count,count)
+                  if total-count>0:
+                        yield (total-count,count)
             
             last_shown=time.time()
             start=time.time()-60
