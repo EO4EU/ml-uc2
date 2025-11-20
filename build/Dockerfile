@@ -1,6 +1,6 @@
 FROM python:3.13.9-slim-trixie
 ENV FLASK_APP=FuelConsumption.py
-RUN apt-get update && apt-get install libsm6 libxext6  -y
+RUN apt-get update && apt-get install libsm6 libxext6 libexpat1  -y
 COPY . /app
 WORKDIR /app
 RUN pip install -r requirements.txt
