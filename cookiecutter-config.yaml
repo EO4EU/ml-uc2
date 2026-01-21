@@ -6,7 +6,7 @@ default_context:
   include_service: "yes"
   service_name: "windprediction"
   service_image_repo: "registry.apps.eo4eu.eu/eo4eu/eo4eu-inference-server/uc2/eo4eu-windprediction"
-  service_image_tag: "91fbb231341f70926322f3a5881bb17f3f90ec49"
+  service_image_tag: "1cd7a793af408edef1a7b3544b8556d4f9a3fdae"
   service_image_pull_policy: "Always"
   service_image_secret: "uc2-registry"
   service_container_port: "8080"
